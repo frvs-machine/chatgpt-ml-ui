@@ -68,40 +68,46 @@ if uploaded_training_file:
         cleaned_testing_data = process_uploaded_file(uploaded_testing_file)
 
         if cleaned_training_data is not None and cleaned_testing_data is not None:
+            # Create target columns
+            cleaned_training_data['Target'] = 'Yes'
+            cleaned_testing_data['Target'] = 'No'
+
             # Combine data for preprocessing
             combined_data = pd.concat([cleaned_training_data, cleaned_testing_data])
             combined_data = pd.get_dummies(combined_data)
 
-            X_train = combined_data[:len(cleaned_training_data)]
-            X_test = combined_data[len(cleaned_training_data):]
+            X = combined_data.drop(columns=['Target'])
+            y = combined_data['Target']
 
-            if 'target_column' in cleaned_training_data.columns:
-                y_train = cleaned_training_data['target_column']  # Replace 'target_column' with the actual target column name
+            # Split the combined data back into training and testing sets
+            X_train = X[combined_data.index < len(cleaned_training_data)]
+            X_test = X[combined_data.index >= len(cleaned_training_data)]
+            y_train = y[combined_data.index < len(cleaned_training_data)]
+            y_test = y[combined_data.index >= len(cleaned_training_data)]
 
-                # Scale data
-                scaler = StandardScaler()
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
+            # Scale data
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
 
-                # Train a neural network model
-                model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
-                model.fit(X_train, y_train)
+            # Train a neural network model
+            model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
+            model.fit(X_train, y_train)
 
-                # Predict and score the test data
-                y_pred = model.predict(X_test)
-                st.write('Predictions for the testing data:')
-                st.write(y_pred)
+            # Predict and score the test data
+            y_pred = model.predict(X_test)
+            st.write('Predictions for the testing data:')
+            st.write(y_pred)
 
-                # Create a DataFrame with predictions
-                results = pd.DataFrame(X_test, columns=combined_data.columns)
-                results['Predictions'] = y_pred
+            # Create a DataFrame with predictions
+            results = pd.DataFrame(X_test, columns=X.columns)
+            results['Predictions'] = y_pred
+            results['Actual'] = y_test.values
 
-                # Export the results to an Excel file
-                try:
-                    results_file = 'predictions.xlsx'
-                    results.to_excel(results_file, index=False)
-                    st.success(f'Results have been exported to {results_file}')
-                except Exception as e:
-                    st.error(f"Error exporting the results: {e}")
-            else:
-                st.warning("No target column found in the training data. Skipping model training and prediction.")
+            # Export the results to an Excel file
+            try:
+                results_file = 'predictions.xlsx'
+                results.to_excel(results_file, index=False)
+                st.success(f'Results have been exported to {results_file}')
+            except Exception as e:
+                st.error(f"Error exporting the results: {e}")
