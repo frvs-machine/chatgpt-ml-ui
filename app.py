@@ -83,10 +83,15 @@ if uploaded_training_file:
             st.write('Combined Data:')
             st.write(combined_data.head())
 
+            # Ensure all categorical variables are converted to numerical values
+            combined_data = pd.get_dummies(combined_data)
+            st.write('Combined Data after encoding:')
+            st.write(combined_data.head())
+
             # Ensure 'Target' column exists before dropping it
             if 'Target' in combined_data.columns:
                 X = combined_data.drop(columns=['Target'])
-                y = combined_data['Target']
+                y = combined_data['Target'].apply(lambda x: 1 if x == 'Yes' else 0)
 
                 # Split the combined data back into training and testing sets
                 X_train = X[combined_data.index < len(cleaned_training_data)]
