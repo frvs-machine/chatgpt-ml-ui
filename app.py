@@ -9,7 +9,12 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
 
 # Set your OpenAI API key from environment variable
-openai.api_key = os.getenv('OPENAI_API_KEY')
+api_key = os.getenv('OPENAI_API_KEY')
+st.write(f"API Key: {api_key}")  # Debug print statement
+if api_key is None:
+    st.error("No API key provided. Please set the OPENAI_API_KEY environment variable.")
+else:
+    openai.api_key = api_key
 
 st.title('ChatGPT Interface with File Upload and ML Predictions')
 
@@ -36,51 +41,67 @@ def clean_data_with_chatgpt(dataframe):
     cleaned_data = pd.read_csv(io.StringIO(cleaned_data_csv))
     return cleaned_data
 
+# Function to read and clean the uploaded file
+def process_uploaded_file(uploaded_file):
+    try:
+        data = pd.read_excel(uploaded_file)
+        st.write('File uploaded successfully')
+        st.write(data.head())  # Display the first few rows for debugging
+        
+        cleaned_data = clean_data_with_chatgpt(data)
+        st.write('Cleaned Data:')
+        st.write(cleaned_data)
+        return cleaned_data
+    except Exception as e:
+        st.error(f"Error reading the file: {e}")
+        return None
+
 # File upload for training data
 uploaded_training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"])
 
 if uploaded_training_file:
-    try:
-        training_data = pd.read_excel(uploaded_training_file)
-        st.write('Training data uploaded successfully')
-        
-        cleaned_training_data = clean_data_with_chatgpt(training_data)
-        st.write('Cleaned Training Data:')
-        st.write(cleaned_training_data)
-    except Exception as e:
-        st.error(f"Error reading the training file: {e}")
+    cleaned_training_data = process_uploaded_file(uploaded_training_file)
 
     # File upload for testing data
     uploaded_testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"])
     if uploaded_testing_file:
-        try:
-            testing_data = pd.read_excel(uploaded_testing_file)
-            st.write('Testing data uploaded successfully')
-            
-            cleaned_testing_data = clean_data_with_chatgpt(testing_data)
-            st.write('Cleaned Testing Data:')
-            st.write(cleaned_testing_data)
-            
+        cleaned_testing_data = process_uploaded_file(uploaded_testing_file)
+
+        if cleaned_training_data is not None and cleaned_testing_data is not None:
             # Combine data for preprocessing
             combined_data = pd.concat([cleaned_training_data, cleaned_testing_data])
             combined_data = pd.get_dummies(combined_data)
-            
+
             X_train = combined_data[:len(cleaned_training_data)]
             X_test = combined_data[len(cleaned_training_data):]
-            y_train = training_data['target_column']  # Replace 'target_column' with the actual target column name
-            
-            # Scale data
-            scaler = StandardScaler()
-            X_train = scaler.fit_transform(X_train)
-            X_test = scaler.transform(X_test)
-            
-            # Train a neural network model
-            model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
-            model.fit(X_train, y_train)
-            
-            # Predict and score the test data
-            y_pred = model.predict(X_test)
-            st.write('Predictions for the testing data:')
-            st.write(y_pred)
-        except Exception as e:
-            st.error(f"Error reading the testing file: {e}")
+
+            if 'target_column' in cleaned_training_data.columns:
+                y_train = cleaned_training_data['target_column']  # Replace 'target_column' with the actual target column name
+
+                # Scale data
+                scaler = StandardScaler()
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
+
+                # Train a neural network model
+                model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
+                model.fit(X_train, y_train)
+
+                # Predict and score the test data
+                y_pred = model.predict(X_test)
+                st.write('Predictions for the testing data:')
+                st.write(y_pred)
+
+                # Create a DataFrame with predictions
+                results = pd.DataFrame(X_test, columns=combined_data.columns)
+                results['Predictions'] = y_pred
+
+                # Export the results to an Excel file
+                try:
+                    results_file = 'predictions.xlsx'
+                    results.to_excel(results_file, index=False)
+                    st.success(f'Results have been exported to {results_file}')
+                except Exception as e:
+                    st.error(f"Error exporting the results: {e}")
+            else:
+                st.warning("No target column found in the training data. Skipping model training and prediction.")
