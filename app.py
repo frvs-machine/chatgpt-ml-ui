@@ -121,8 +121,14 @@ if uploaded_training_file:
 
                 # Export the results to an Excel file
                 try:
-                    results_file = 'predictions.xlsx'
-                    testing_data_with_scores.to_excel(results_file, index=False)
-                    st.success(f'Results have been exported to {results_file}')
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        testing_data_with_scores.to_excel(writer, index=False, sheet_name='Sheet1')
+                    processed_data = output.getvalue()
+                    st.download_button(label="Download Results",
+                                       data=processed_data,
+                                       file_name='predictions.xlsx',
+                                       mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                    st.success("Results are ready for download.")
                 except Exception as e:
                     st.error(f"Error exporting the results: {e}")
