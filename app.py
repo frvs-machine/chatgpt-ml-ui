@@ -77,48 +77,47 @@ if uploaded_training_file:
             st.write(cleaned_training_data.head())
             st.write(cleaned_training_data.columns)  # Print columns for debugging
 
-            # Combine data for preprocessing
-            combined_data = pd.concat([cleaned_training_data, cleaned_testing_data])
-            st.write('Combined Data:')
-            st.write(combined_data.head())
-            st.write(combined_data.columns)  # Print columns for debugging
-
             # Ensure all categorical variables are converted to numerical values
+            combined_data = pd.concat([cleaned_training_data, cleaned_testing_data], ignore_index=True)
             combined_data = pd.get_dummies(combined_data)
-            st.write('Combined Data after encoding:')
-            st.write(combined_data.head())
-            st.write(combined_data.columns)  # Print columns for debugging
 
             # Split combined data back into training and testing sets
-            X_train = combined_data[combined_data.index < len(cleaned_training_data)]
-            X_test = combined_data[combined_data.index >= len(cleaned_training_data)]
-            y_train = X_train.pop('Target')
-            X_test = X_test.drop(columns=['Target'])  # Ensure Target is not in testing data
+            X_train = combined_data.iloc[:len(cleaned_training_data)].drop(columns=['Target'])
+            y_train = combined_data.iloc[:len(cleaned_training_data)]['Target']
+            X_test = combined_data.iloc[len(cleaned_training_data):].drop(columns=['Target'])
 
-            # Scale data
-            scaler = StandardScaler()
-            X_train = scaler.fit_transform(X_train)
-            X_test = scaler.transform(X_test)
+            # Debugging: Print shapes of training and testing sets
+            st.write(f"X_train shape: {X_train.shape}")
+            st.write(f"y_train shape: {y_train.shape}")
+            st.write(f"X_test shape: {X_test.shape}")
 
-            # Train a neural network model
-            model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
-            model.fit(X_train, y_train)
+            if X_test.empty:
+                st.error("X_test is empty. Please check the data processing steps.")
+            else:
+                # Scale data
+                scaler = StandardScaler()
+                X_train = scaler.fit_transform(X_train)
+                X_test = scaler.transform(X_test)
 
-            # Predict probabilities for the test data
-            y_pred_proba = model.predict_proba(X_test)[:, 1]
+                # Train a neural network model
+                model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
+                model.fit(X_train, y_train)
 
-            # Calculate percentiles
-            percentiles = np.percentile(y_pred_proba, np.arange(100))
+                # Predict probabilities for the test data
+                y_pred_proba = model.predict_proba(X_test)[:, 1]
 
-            # Create a DataFrame with the original testing data and the predicted probabilities
-            testing_data_with_scores = cleaned_testing_data.copy()
-            testing_data_with_scores['Lookalike_Score'] = y_pred_proba
-            testing_data_with_scores['Percentile'] = np.percentile(y_pred_proba, np.arange(100))
+                # Calculate percentiles
+                percentiles = np.percentile(y_pred_proba, np.arange(100))
 
-            # Export the results to an Excel file
-            try:
-                results_file = 'predictions.xlsx'
-                testing_data_with_scores.to_excel(results_file, index=False)
-                st.success(f'Results have been exported to {results_file}')
-            except Exception as e:
-                st.error(f"Error exporting the results: {e}")
+                # Create a DataFrame with the original testing data and the predicted probabilities
+                testing_data_with_scores = cleaned_testing_data.copy()
+                testing_data_with_scores['Lookalike_Score'] = y_pred_proba
+                testing_data_with_scores['Percentile'] = [np.sum(y_pred_proba <= x) for x in y_pred_proba]
+
+                # Export the results to an Excel file
+                try:
+                    results_file = 'predictions.xlsx'
+                    testing_data_with_scores.to_excel(results_file, index=False)
+                    st.success(f'Results have been exported to {results_file}')
+                except Exception as e:
+                    st.error(f"Error exporting the results: {e}")
