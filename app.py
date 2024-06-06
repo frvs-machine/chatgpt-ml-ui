@@ -4,6 +4,7 @@ import openai
 import io
 import os
 import numpy as np
+from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
@@ -81,17 +82,21 @@ if uploaded_training_file:
             combined_data = pd.concat([cleaned_training_data, cleaned_testing_data], ignore_index=True)
             combined_data = pd.get_dummies(combined_data)
 
+            # Handle missing values
+            imputer = SimpleImputer(strategy='mean')
+            combined_data_imputed = imputer.fit_transform(combined_data)
+
             # Split combined data back into training and testing sets
-            X_train = combined_data.iloc[:len(cleaned_training_data)].drop(columns=['Target'])
-            y_train = combined_data.iloc[:len(cleaned_training_data)]['Target']
-            X_test = combined_data.iloc[len(cleaned_training_data):].drop(columns=['Target'])
+            X_train = combined_data_imputed[:len(cleaned_training_data), :-1]  # Exclude Target column
+            y_train = combined_data_imputed[:len(cleaned_training_data), -1]  # Target column
+            X_test = combined_data_imputed[len(cleaned_training_data):, :-1]  # Exclude Target column
 
             # Debugging: Print shapes of training and testing sets
             st.write(f"X_train shape: {X_train.shape}")
             st.write(f"y_train shape: {y_train.shape}")
             st.write(f"X_test shape: {X_test.shape}")
 
-            if X_test.empty:
+            if X_test.shape[0] == 0:
                 st.error("X_test is empty. Please check the data processing steps.")
             else:
                 # Scale data
