@@ -69,17 +69,13 @@ if uploaded_training_file:
         cleaned_testing_data = process_uploaded_file(uploaded_testing_file)
 
         if cleaned_training_data is not None and cleaned_testing_data is not None:
-            # Create target columns
-            cleaned_training_data['Target'] = 'Yes'
-            cleaned_testing_data['Target'] = 'No'
+            # Create target column for training data
+            cleaned_training_data['Target'] = 1  # Use 1 for the training data as the lookalike target
 
             # Debugging: Check if 'Target' column is added
             st.write('Training Data with Target:')
             st.write(cleaned_training_data.head())
             st.write(cleaned_training_data.columns)  # Print columns for debugging
-            st.write('Testing Data with Target:')
-            st.write(cleaned_testing_data.head())
-            st.write(cleaned_testing_data.columns)  # Print columns for debugging
 
             # Combine data for preprocessing
             combined_data = pd.concat([cleaned_training_data, cleaned_testing_data])
@@ -93,48 +89,36 @@ if uploaded_training_file:
             st.write(combined_data.head())
             st.write(combined_data.columns)  # Print columns for debugging
 
-            # Ensure 'Target' column exists before dropping it
-            if 'Target_Yes' in combined_data.columns:
-                X = combined_data.drop(columns=['Target_Yes', 'Target_No'])
-                y = combined_data['Target_Yes']
+            # Split combined data back into training and testing sets
+            X_train = combined_data[combined_data.index < len(cleaned_training_data)]
+            X_test = combined_data[combined_data.index >= len(cleaned_training_data)]
+            y_train = X_train.pop('Target')
+            X_test = X_test.drop(columns=['Target'])  # Ensure Target is not in testing data
 
-                # Split the combined data back into training and testing sets
-                X_train = X[combined_data.index < len(cleaned_training_data)]
-                X_test = X[combined_data.index >= len(cleaned_training_data)]
-                y_train = y[combined_data.index < len(cleaned_training_data)]
-                y_test = y[combined_data.index >= len(cleaned_training_data)]
+            # Scale data
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
 
-                # Scale data
-                scaler = StandardScaler()
-                X_train = scaler.fit_transform(X_train)
-                X_test = scaler.transform(X_test)
+            # Train a neural network model
+            model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
+            model.fit(X_train, y_train)
 
-                # Train a neural network model
-                model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=500)
-                model.fit(X_train, y_train)
+            # Predict probabilities for the test data
+            y_pred_proba = model.predict_proba(X_test)[:, 1]
 
-                # Predict and score the test data
-                y_pred_proba = model.predict_proba(X_test)[:, 1]
-                y_pred = model.predict(X_test)
+            # Calculate percentiles
+            percentiles = np.percentile(y_pred_proba, np.arange(100))
 
-                # Calculate percentiles
-                percentiles = np.percentile(y_pred_proba, np.arange(100))
+            # Create a DataFrame with the original testing data and the predicted probabilities
+            testing_data_with_scores = cleaned_testing_data.copy()
+            testing_data_with_scores['Lookalike_Score'] = y_pred_proba
+            testing_data_with_scores['Percentile'] = np.percentile(y_pred_proba, np.arange(100))
 
-                st.write('Predictions for the testing data:')
-                st.write(y_pred)
-
-                # Create a DataFrame with predictions and percentiles
-                original_testing_data = cleaned_testing_data.copy()
-                original_testing_data['Predicted_Probabilities'] = y_pred_proba
-                original_testing_data['Predictions'] = y_pred
-                original_testing_data['Percentiles'] = [np.sum(y_pred_proba <= x) for x in y_pred_proba]
-
-                # Export the results to an Excel file
-                try:
-                    results_file = 'predictions.xlsx'
-                    original_testing_data.to_excel(results_file, index=False)
-                    st.success(f'Results have been exported to {results_file}')
-                except Exception as e:
-                    st.error(f"Error exporting the results: {e}")
-            else:
-                st.error("Target column not found in combined data.")
+            # Export the results to an Excel file
+            try:
+                results_file = 'predictions.xlsx'
+                testing_data_with_scores.to_excel(results_file, index=False)
+                st.success(f'Results have been exported to {results_file}')
+            except Exception as e:
+                st.error(f"Error exporting the results: {e}")
