@@ -3,6 +3,7 @@ import pandas as pd
 import openai
 import io
 import os
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
@@ -75,23 +76,27 @@ if uploaded_training_file:
             # Debugging: Check if 'Target' column is added
             st.write('Training Data with Target:')
             st.write(cleaned_training_data.head())
+            st.write(cleaned_training_data.columns)  # Print columns for debugging
             st.write('Testing Data with Target:')
             st.write(cleaned_testing_data.head())
+            st.write(cleaned_testing_data.columns)  # Print columns for debugging
 
             # Combine data for preprocessing
             combined_data = pd.concat([cleaned_training_data, cleaned_testing_data])
             st.write('Combined Data:')
             st.write(combined_data.head())
+            st.write(combined_data.columns)  # Print columns for debugging
 
             # Ensure all categorical variables are converted to numerical values
             combined_data = pd.get_dummies(combined_data)
             st.write('Combined Data after encoding:')
             st.write(combined_data.head())
+            st.write(combined_data.columns)  # Print columns for debugging
 
             # Ensure 'Target' column exists before dropping it
-            if 'Target' in combined_data.columns:
-                X = combined_data.drop(columns=['Target'])
-                y = combined_data['Target'].apply(lambda x: 1 if x == 'Yes' else 0)
+            if 'Target_Yes' in combined_data.columns:
+                X = combined_data.drop(columns=['Target_Yes', 'Target_No'])
+                y = combined_data['Target_Yes']
 
                 # Split the combined data back into training and testing sets
                 X_train = X[combined_data.index < len(cleaned_training_data)]
@@ -109,19 +114,25 @@ if uploaded_training_file:
                 model.fit(X_train, y_train)
 
                 # Predict and score the test data
+                y_pred_proba = model.predict_proba(X_test)[:, 1]
                 y_pred = model.predict(X_test)
+
+                # Calculate percentiles
+                percentiles = np.percentile(y_pred_proba, np.arange(100))
+
                 st.write('Predictions for the testing data:')
                 st.write(y_pred)
 
-                # Create a DataFrame with predictions
-                results = pd.DataFrame(X_test, columns=X.columns)
-                results['Predictions'] = y_pred
-                results['Actual'] = y_test.values
+                # Create a DataFrame with predictions and percentiles
+                original_testing_data = cleaned_testing_data.copy()
+                original_testing_data['Predicted_Probabilities'] = y_pred_proba
+                original_testing_data['Predictions'] = y_pred
+                original_testing_data['Percentiles'] = [np.sum(y_pred_proba <= x) for x in y_pred_proba]
 
                 # Export the results to an Excel file
                 try:
                     results_file = 'predictions.xlsx'
-                    results.to_excel(results_file, index=False)
+                    original_testing_data.to_excel(results_file, index=False)
                     st.success(f'Results have been exported to {results_file}')
                 except Exception as e:
                     st.error(f"Error exporting the results: {e}")
