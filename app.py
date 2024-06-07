@@ -49,8 +49,7 @@ def process_uploaded_file(uploaded_file):
         data = pd.read_excel(uploaded_file)
         st.write('File uploaded successfully')
         st.write(data.head())  # Display the first few rows for debugging
-
-        # Clean data using OpenAI
+        
         cleaned_data = clean_data_with_chatgpt(data)
         st.write('Cleaned Data:')
         st.write(cleaned_data)
@@ -119,6 +118,14 @@ if uploaded_training_file:
                 testing_data_with_scores = cleaned_testing_data.copy()
                 testing_data_with_scores['Lookalike_Score'] = y_pred_proba
                 testing_data_with_scores['Percentile'] = [np.sum(y_pred_proba <= x) for x in y_pred_proba]
+
+                # Add a text input for user queries
+                user_query = st.text_input("Enter your query to adjust scoring (e.g., 'Myakka City'):")
+
+                if user_query:
+                    # Adjust scores based on user query
+                    matching_indices = testing_data_with_scores.apply(lambda row: user_query.lower() in row.astype(str).str.lower().values, axis=1)
+                    testing_data_with_scores.loc[matching_indices, 'Lookalike_Score'] *= 1.2  # Increase scores by 20% for matching rows
 
                 # Export the results to an Excel file
                 try:
