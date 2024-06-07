@@ -20,70 +20,72 @@ else:
 
 st.title('ChatGPT Interface with File Upload and ML Predictions')
 
-# Add a text input for user queries
+# Function to call OpenAI API for data cleaning
+def clean_data_with_chatgpt(dataframe):
+    prompt = (
+        "Clean this data and format it into the following columns: First_Name, Last_Name, "
+        "Address1, Address2, City, State, Zip5. Ensure the data matches the format."
+    )
+
+    messages = [
+        {"role": "system", "content": "You are a data cleaning assistant."},
+        {"role": "user", "content": prompt},
+        {"role": "user", "content": dataframe.to_csv(index=False)}
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        max_tokens=1500
+    )
+
+    cleaned_data_csv = response['choices'][0]['message']['content']
+    cleaned_data = pd.read_csv(io.StringIO(cleaned_data_csv))
+    return cleaned_data
+
+# Function to read and clean the uploaded file
+def process_uploaded_file(uploaded_file):
+    try:
+        data = pd.read_excel(uploaded_file)
+        st.write('File uploaded successfully')
+        st.write(data.head())  # Display the first few rows for debugging
+
+        cleaned_data = clean_data_with_chatgpt(data)
+        st.write('Cleaned Data:')
+        st.write(cleaned_data)
+        return cleaned_data
+    except Exception as e:
+        st.error(f"Error reading the file: {e}")
+        return None
+
+# Function to process user query through ChatGPT
+def process_query_with_chatgpt(query):
+    prompt = (
+        f"Process this query to adjust model focus for a dataset: {query}. "
+        "Extract relevant information such as city names, and any other specific parameters mentioned."
+    )
+
+    messages = [
+        {"role": "system", "content": "You are a data processing assistant."},
+        {"role": "user", "content": prompt}
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        max_tokens=500
+    )
+
+    processed_query = response['choices'][0]['message']['content']
+    return processed_query
+
+# User query input
 user_query = st.text_input("Enter your query to adjust model focus (e.g., 'Run a model for lookalikes using the training data for the testing dataset with a focus for all records in Riverview'):")
 
 # Add an enter button
-if st.button('Enter'):
-    # Function to call OpenAI API for data cleaning
-    def clean_data_with_chatgpt(dataframe):
-        prompt = (
-            "Clean this data and format it into the following columns: First_Name, Last_Name, "
-            "Address1, Address2, City, State, Zip5. Ensure the data matches the format."
-        )
+query_submitted = st.button('Enter')
 
-        messages = [
-            {"role": "system", "content": "You are a data cleaning assistant."},
-            {"role": "user", "content": prompt},
-            {"role": "user", "content": dataframe.to_csv(index=False)}
-        ]
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=1500
-        )
-
-        cleaned_data_csv = response['choices'][0]['message']['content']
-        cleaned_data = pd.read_csv(io.StringIO(cleaned_data_csv))
-        return cleaned_data
-
-    # Function to read and clean the uploaded file
-    def process_uploaded_file(uploaded_file):
-        try:
-            data = pd.read_excel(uploaded_file)
-            st.write('File uploaded successfully')
-            st.write(data.head())  # Display the first few rows for debugging
-
-            cleaned_data = clean_data_with_chatgpt(data)
-            st.write('Cleaned Data:')
-            st.write(cleaned_data)
-            return cleaned_data
-        except Exception as e:
-            st.error(f"Error reading the file: {e}")
-            return None
-
-    # Function to process user query through ChatGPT
-    def process_query_with_chatgpt(query):
-        prompt = (
-            f"Process this query to adjust model focus for a dataset: {query}. "
-            "Extract relevant information such as city names, and any other specific parameters mentioned."
-        )
-
-        messages = [
-            {"role": "system", "content": "You are a data processing assistant."},
-            {"role": "user", "content": prompt}
-        ]
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=500
-        )
-
-        processed_query = response['choices'][0]['message']['content']
-        return processed_query
-
+if query_submitted and user_query:
     # Process the user query
     processed_query = process_query_with_chatgpt(user_query)
     st.write(f"Processed Query: {processed_query}")  # Debug print statement
