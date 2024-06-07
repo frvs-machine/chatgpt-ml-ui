@@ -213,15 +213,3 @@ if uploaded_training_file:
 
                         if updated_results is not None:
                             # Export the results to an Excel file
-                            try:
-                            output = io.BytesIO()
-                            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                                updated_results.to_excel(writer, index=False, sheet_name='Sheet1')
-                            processed_data = output.getvalue()
-                            st.download_button(label="Download Results",
-                                               data=processed_data,
-                                               file_name='updated_predictions.xlsx',
-                                               mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                            st.success("Results are ready for download.")
-                        except Exception as e:
-                            st.error(f"Error exporting the results: {e}")"
