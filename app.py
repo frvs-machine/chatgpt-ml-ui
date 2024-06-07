@@ -212,4 +212,4 @@ if uploaded_training_file:
                         updated_results = re_run_model_based_on_query(model, cleaned_training_data, testing_data_with_scores, user_query)
 
                         if updated_results is not None:
-                            #
+                            # Export the results to an Excel file
