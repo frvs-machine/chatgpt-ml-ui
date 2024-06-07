@@ -7,7 +7,6 @@ import numpy as np
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score
 
 # Set your OpenAI API key from environment variable
 api_key = os.getenv('OPENAI_API_KEY')
@@ -96,9 +95,13 @@ def run_model(training_data, testing_data):
         # Predict probabilities for the test data
         y_pred_proba = model.predict_proba(X_test)[:, 1]
 
+        # Calculate percentiles
+        percentiles = np.percentile(y_pred_proba, np.arange(100))
+
         # Create a DataFrame with the original testing data and the predicted probabilities
         testing_data_with_scores = testing_data.copy()
         testing_data_with_scores['Lookalike_Score'] = y_pred_proba
+        testing_data_with_scores['Percentile'] = pd.qcut(y_pred_proba, 100, labels=False) + 1
         return model, testing_data_with_scores
 
 # Function to filter or re-run the model based on the query
