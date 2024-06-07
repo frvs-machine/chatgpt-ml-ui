@@ -211,4 +211,5 @@ if uploaded_training_file:
                         # Process the query
                         updated_results = re_run_model_based_on_query(model, cleaned_training_data, testing_data_with_scores, user_query)
 
-                        if updated
+                        if updated_results is not None:
+                            # Export
