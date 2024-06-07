@@ -5,7 +5,6 @@ import io
 import os
 import numpy as np
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
@@ -20,22 +19,14 @@ else:
 st.title('ChatGPT Interface with File Upload and ML Predictions')
 
 # Initialize session state
-if 'user_query' not in st.session_state:
-    st.session_state.user_query = ""
 if 'training_file' not in st.session_state:
     st.session_state.training_file = None
 if 'testing_file' not in st.session_state:
     st.session_state.testing_file = None
+if 'query_submitted' not in st.session_state:
+    st.session_state.query_submitted = False
 
-# Add a text input for user queries
-st.session_state.user_query = st.text_input(
-    "Enter your query to adjust model focus (e.g., 'Run a model for lookalikes using the training data for the testing dataset with a focus for all records in Riverview'):",
-    value=st.session_state.user_query
-)
-
-# Add an enter button
-query_submitted = st.button('Enter')
-
+@st.cache_data
 def clean_data_with_chatgpt(dataframe):
     prompt = (
         "Clean this data and format it into the following columns: First_Name, Last_Name, "
@@ -55,20 +46,17 @@ def clean_data_with_chatgpt(dataframe):
     cleaned_data = pd.read_csv(io.StringIO(cleaned_data_csv))
     return cleaned_data
 
+@st.cache_data
 def process_uploaded_file(uploaded_file):
     try:
         data = pd.read_excel(uploaded_file)
-        st.write('File uploaded successfully')
-        st.write(data.head())  # Display the first few rows for debugging
-
         cleaned_data = clean_data_with_chatgpt(data)
-        st.write('Cleaned Data:')
-        st.write(cleaned_data)
         return cleaned_data
     except Exception as e:
         st.error(f"Error reading the file: {e}")
         return None
 
+@st.cache_data
 def process_query_with_chatgpt(query):
     prompt = (
         f"Process this query to adjust model focus for a dataset: {query}. "
@@ -86,36 +74,44 @@ def process_query_with_chatgpt(query):
     processed_query = response['choices'][0]['message']['content']
     return processed_query
 
-if query_submitted and st.session_state.user_query:
-    processed_query = process_query_with_chatgpt(st.session_state.user_query)
-    st.write(f"Processed Query: {processed_query}")  # Debug print statement
+# File upload for training data
+st.session_state.training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"], key="training_file")
 
-    # Extract city or other parameters from the processed query (this is a simple example)
-    city = None
-    if "Riverview" in processed_query:
-        city = "Riverview"
+if st.session_state.training_file:
+    cleaned_training_data = process_uploaded_file(st.session_state.training_file)
 
-    # File upload for training data
-    uploaded_training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"], key="training_file")
+    # File upload for testing data
+    st.session_state.testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"], key="testing_file")
+    if st.session_state.testing_file:
+        cleaned_testing_data = process_uploaded_file(st.session_state.testing_file)
 
-    if uploaded_training_file:
-        st.session_state.training_file = uploaded_training_file
-        cleaned_training_data = process_uploaded_file(st.session_state.training_file)
+        if cleaned_training_data is not None and cleaned_testing_data is not None:
+            # Create target column for training data
+            cleaned_training_data['Target'] = 1  # Use 1 for the training data as the lookalike target
 
-        # File upload for testing data
-        uploaded_testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"], key="testing_file")
-        if uploaded_testing_file:
-            st.session_state.testing_file = uploaded_testing_file
-            cleaned_testing_data = process_uploaded_file(st.session_state.testing_file)
+            # Debugging: Check if 'Target' column is added
+            st.write('Training Data with Target:')
+            st.write(cleaned_training_data.head())
+            st.write(cleaned_training_data.columns)  # Print columns for debugging
 
-            if cleaned_training_data is not None and cleaned_testing_data is not None:
-                # Create target column for training data
-                cleaned_training_data['Target'] = 1  # Use 1 for the training data as the lookalike target
+            # Add a text input for user queries
+            st.session_state.user_query = st.text_input(
+                "Enter your query to adjust model focus (e.g., 'Run a model for lookalikes using the training data for the testing dataset with a focus for all records in Riverview'):",
+                value=st.session_state.user_query
+            )
 
-                # Debugging: Check if 'Target' column is added
-                st.write('Training Data with Target:')
-                st.write(cleaned_training_data.head())
-                st.write(cleaned_training_data.columns)  # Print columns for debugging
+            # Add an enter button
+            query_submitted = st.button('Run Model')
+
+            if query_submitted and st.session_state.user_query:
+                st.session_state.query_submitted = True
+                processed_query = process_query_with_chatgpt(st.session_state.user_query)
+                st.write(f"Processed Query: {processed_query}")  # Debug print statement
+
+                # Extract city or other parameters from the processed query (this is a simple example)
+                city = None
+                if "Riverview" in processed_query:
+                    city = "Riverview"
 
                 # Filter testing data based on the query
                 if city:
