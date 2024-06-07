@@ -20,6 +20,9 @@ else:
 
 st.title('ChatGPT Interface with File Upload and ML Predictions')
 
+# Add a text input for user queries
+user_query = st.text_input("Enter your query to adjust model focus (e.g., 'Run a model for lookalikes using the training data for the testing dataset with a focus for all records in Riverview'):")
+
 # Function to call OpenAI API for data cleaning
 def clean_data_with_chatgpt(dataframe):
     prompt = (
@@ -57,6 +60,16 @@ def process_uploaded_file(uploaded_file):
     except Exception as e:
         st.error(f"Error reading the file: {e}")
         return None
+
+# Parse the user query to extract keywords
+def parse_user_query(query):
+    # This is a simple example of extracting a city name from the query.
+    # In a real-world application, you might use NLP techniques to parse the query more robustly.
+    if "Riverview" in query:
+        return "Riverview"
+    return None
+
+focus_city = parse_user_query(user_query)
 
 # File upload for training data
 uploaded_training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"])
@@ -111,6 +124,12 @@ if uploaded_training_file:
                 # Predict probabilities for the test data
                 y_pred_proba = model.predict_proba(X_test)[:, 1]
 
+                # Adjust scores based on user query
+                if focus_city:
+                    city_column = [col for col in cleaned_testing_data.columns if 'City' in col][0]
+                    matching_indices = cleaned_testing_data[city_column].str.contains(focus_city, case=False, na=False)
+                    y_pred_proba[matching_indices] *= 1.2  # Increase scores by 20% for matching rows
+
                 # Calculate percentiles
                 percentiles = np.percentile(y_pred_proba, np.arange(100))
 
@@ -118,14 +137,6 @@ if uploaded_training_file:
                 testing_data_with_scores = cleaned_testing_data.copy()
                 testing_data_with_scores['Lookalike_Score'] = y_pred_proba
                 testing_data_with_scores['Percentile'] = [np.sum(y_pred_proba <= x) for x in y_pred_proba]
-
-                # Add a text input for user queries
-                user_query = st.text_input("Enter your query to adjust scoring (e.g., 'Myakka City'):")
-
-                if user_query:
-                    # Adjust scores based on user query
-                    matching_indices = testing_data_with_scores.apply(lambda row: user_query.lower() in row.astype(str).str.lower().values, axis=1)
-                    testing_data_with_scores.loc[matching_indices, 'Lookalike_Score'] *= 1.2  # Increase scores by 20% for matching rows
 
                 # Export the results to an Excel file
                 try:
