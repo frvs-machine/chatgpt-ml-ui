@@ -19,6 +19,8 @@ else:
 st.title('ChatGPT Interface with File Upload and ML Predictions')
 
 # Initialize session state
+if 'user_query' not in st.session_state:
+    st.session_state.user_query = ""
 if 'training_file' not in st.session_state:
     st.session_state.training_file = None
 if 'testing_file' not in st.session_state:
@@ -75,15 +77,16 @@ def process_query_with_chatgpt(query):
     return processed_query
 
 # File upload for training data
-st.session_state.training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"], key="training_file")
-
-if st.session_state.training_file:
-    cleaned_training_data = process_uploaded_file(st.session_state.training_file)
+uploaded_training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"], key="training_file")
+if uploaded_training_file:
+    st.session_state.training_file = uploaded_training_file
+    cleaned_training_data = process_uploaded_file(uploaded_training_file)
 
     # File upload for testing data
-    st.session_state.testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"], key="testing_file")
-    if st.session_state.testing_file:
-        cleaned_testing_data = process_uploaded_file(st.session_state.testing_file)
+    uploaded_testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"], key="testing_file")
+    if uploaded_testing_file:
+        st.session_state.testing_file = uploaded_testing_file
+        cleaned_testing_data = process_uploaded_file(uploaded_testing_file)
 
         if cleaned_training_data is not None and cleaned_testing_data is not None:
             # Create target column for training data
