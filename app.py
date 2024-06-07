@@ -212,8 +212,8 @@ if uploaded_training_file:
                         updated_results = re_run_model_based_on_query(model, cleaned_training_data, testing_data_with_scores, user_query)
 
                         if updated_results is not None:
-                            try:
-                                output = io.BytesIO()
+    try:
+        output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             updated_results.to_excel(writer, index=False, sheet_name='Sheet1')
         processed_data = output.getvalue()
@@ -224,3 +224,5 @@ if uploaded_training_file:
         st.success("Results are ready for download.")
     except Exception as e:
         st.error(f"Error exporting the results: {e}")
+
+
