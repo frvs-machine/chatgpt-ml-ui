@@ -49,7 +49,8 @@ def process_uploaded_file(uploaded_file):
         data = pd.read_excel(uploaded_file)
         st.write('File uploaded successfully')
         st.write(data.head())  # Display the first few rows for debugging
-        
+
+        # Clean data using OpenAI
         cleaned_data = clean_data_with_chatgpt(data)
         st.write('Cleaned Data:')
         st.write(cleaned_data)
