@@ -101,6 +101,23 @@ def run_model(training_data, testing_data):
         testing_data_with_scores['Lookalike_Score'] = y_pred_proba
         return model, testing_data_with_scores
 
+# Function to filter or re-run the model based on the query
+def process_query(model, training_data, testing_data, query):
+    if "emphasis on" in query.lower():
+        emphasis_city = query.lower().replace("emphasis on", "").strip()
+        filtered_data = testing_data[testing_data.apply(lambda row: emphasis_city in row.astype(str).str.lower().values, axis=1)]
+        if not filtered_data.empty:
+            _, adjusted_data = run_model(training_data, filtered_data)
+            st.write("Re-run Model Results with Emphasis:")
+            st.write(adjusted_data.head())
+            return adjusted_data
+    else:
+        matching_indices = testing_data.apply(lambda row: query.lower() in row.astype(str).str.lower().values, axis=1)
+        filtered_data = testing_data[matching_indices]
+        st.write("Filtered Results:")
+        st.write(filtered_data.head())
+        return filtered_data
+
 # File upload for training data
 uploaded_training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"])
 
@@ -120,36 +137,23 @@ if uploaded_training_file:
                 st.write(testing_data_with_scores.head())
 
                 # Add a text input for user queries
-                user_query = st.text_input("Enter your query to adjust scoring (e.g., 'Myakka City'):")
+                user_query = st.text_input("Enter parameters to re-run model based on inputs:")
 
                 if user_query:
-                    # Adjust scores based on user query
-                    if user_query:
-                        # Re-run the model with emphasis on the specified city
-                        if "emphasis" in user_query.lower():
-                            emphasis_city = user_query.lower().replace("emphasis on", "").strip()
-                            filtered_data = cleaned_testing_data[cleaned_testing_data.apply(lambda row: emphasis_city in row.astype(str).str.lower().values, axis=1)]
-                            if not filtered_data.empty:
-                                _, adjusted_data = run_model(cleaned_training_data, filtered_data)
-                                st.write("Re-run Model Results with Emphasis:")
-                                st.write(adjusted_data.head())
-                                testing_data_with_scores = adjusted_data
+                    # Process the query
+                    updated_results = process_query(model, cleaned_training_data, testing_data_with_scores, user_query)
 
-                        # Filter results based on the specified city
-                        else:
-                            matching_indices = testing_data_with_scores.apply(lambda row: user_query.lower() in row.astype(str).str.lower().values, axis=1)
-                            testing_data_with_scores = testing_data_with_scores[matching_indices]
-
-                    # Export the results to an Excel file
-                    try:
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                            testing_data_with_scores.to_excel(writer, index=False, sheet_name='Sheet1')
-                        processed_data = output.getvalue()
-                        st.download_button(label="Download Results",
-                                           data=processed_data,
-                                           file_name='predictions.xlsx',
-                                           mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                        st.success("Results are ready for download.")
-                    except Exception as e:
-                        st.error(f"Error exporting the results: {e}")
+                    if updated_results is not None:
+                        # Export the results to an Excel file
+                        try:
+                            output = io.BytesIO()
+                            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                                updated_results.to_excel(writer, index=False, sheet_name='Sheet1')
+                            processed_data = output.getvalue()
+                            st.download_button(label="Download Results",
+                                               data=processed_data,
+                                               file_name='updated_predictions.xlsx',
+                                               mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                            st.success("Results are ready for download.")
+                        except Exception as e:
+                            st.error(f"Error exporting the results: {e}")
