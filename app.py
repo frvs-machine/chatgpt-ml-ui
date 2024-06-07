@@ -194,4 +194,21 @@ if uploaded_training_file:
                 try:
                     initial_output = io.BytesIO()
                     with pd.ExcelWriter(initial_output, engine='xlsxwriter') as writer:
-                        testing_data_with_scores.to_excel(writer
+                        testing_data_with_scores.to_excel(writer, index=False, sheet_name='InitialResults')
+                    initial_processed_data = initial_output.getvalue()
+                    st.download_button(label="Download Initial Results",
+                                       data=initial_processed_data,
+                                       file_name='initial_predictions.xlsx',
+                                       mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                except Exception as e:
+                    st.error(f"Error exporting the initial results: {e}")
+
+                # Add a text input for user queries
+                user_query = st.text_input("Adjust parameters to re-run model based on user-input criteria:")
+
+                if st.button('Re-run Model'):
+                    if user_query:
+                        # Process the query
+                        updated_results = re_run_model_based_on_query(model, cleaned_training_data, cleaned_testing_data, user_query)
+
+                        if updated
