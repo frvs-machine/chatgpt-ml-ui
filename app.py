@@ -34,8 +34,7 @@ st.session_state.user_query = st.text_input(
 )
 
 # Add an enter button
-if st.button('Enter'):
-    st.session_state.query_submitted = True
+query_submitted = st.button('Enter')
 
 def clean_data_with_chatgpt(dataframe):
     prompt = (
@@ -87,8 +86,7 @@ def process_query_with_chatgpt(query):
     processed_query = response['choices'][0]['message']['content']
     return processed_query
 
-# Handle the query submission and file uploads
-if st.session_state.get('query_submitted'):
+if query_submitted and st.session_state.user_query:
     processed_query = process_query_with_chatgpt(st.session_state.user_query)
     st.write(f"Processed Query: {processed_query}")  # Debug print statement
 
@@ -98,14 +96,16 @@ if st.session_state.get('query_submitted'):
         city = "Riverview"
 
     # File upload for training data
-    st.session_state.training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"], key="training_file")
+    uploaded_training_file = st.file_uploader("Upload a training Excel file", type=["xlsx"], key="training_file")
 
-    if st.session_state.training_file:
+    if uploaded_training_file:
+        st.session_state.training_file = uploaded_training_file
         cleaned_training_data = process_uploaded_file(st.session_state.training_file)
 
         # File upload for testing data
-        st.session_state.testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"], key="testing_file")
-        if st.session_state.testing_file:
+        uploaded_testing_file = st.file_uploader("Upload a testing Excel file", type=["xlsx"], key="testing_file")
+        if uploaded_testing_file:
+            st.session_state.testing_file = uploaded_testing_file
             cleaned_testing_data = process_uploaded_file(st.session_state.testing_file)
 
             if cleaned_training_data is not None and cleaned_testing_data is not None:
