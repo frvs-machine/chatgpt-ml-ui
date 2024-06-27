@@ -7,22 +7,25 @@ import numpy as np
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
 
 # Set your OpenAI API key from environment variable
 api_key = os.getenv('OPENAI_API_KEY')
-st.write(f"API Key: {api_key}")  # Debug print statement
 if api_key is None:
     st.error("No API key provided. Please set the OPENAI_API_KEY environment variable.")
 else:
     openai.api_key = api_key
 
-st.title('ChatGPT Interface with File Upload and ML Predictions')
+st.title('Enhanced Data Processing and ML Model Interface')
+st.write("This app uses GPT-4.0 for data cleaning.")
 
 # Function to call OpenAI API for data cleaning
 def clean_data_with_chatgpt(dataframe):
     prompt = (
         "Clean this data and format it into the following columns: First_Name, Last_Name, "
-        "Address1, Address2, City, State, Zip5. Ensure the data matches the format."
+        "Address1, Address2, City, State, Zip5. Normalize the data, correct capitalization, "
+        "and remove any prefixes in names. Ensure the data matches the format."
     )
 
     messages = [
@@ -32,7 +35,7 @@ def clean_data_with_chatgpt(dataframe):
     ]
 
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4.0",
         messages=messages,
         max_tokens=1500
     )
@@ -56,8 +59,8 @@ def process_uploaded_file(uploaded_file):
         st.error(f"Error reading the file: {e}")
         return None
 
-# Function to run the model
-def run_model(training_data, testing_data):
+# Function to run the neural network model
+def run_neural_net_model(training_data, testing_data):
     # Create target column for training data
     training_data['Target'] = 1  # Use 1 for the training data as the lookalike target
 
@@ -104,7 +107,55 @@ def run_model(training_data, testing_data):
         testing_data_with_scores['Percentile'] = pd.qcut(y_pred_proba, 100, labels=False) + 1
         return model, testing_data_with_scores
 
-# Function to process and re-run the model based on user input
+# Function to run the linear regression model
+def run_linear_regression_model(training_data, testing_data):
+    # Create target column for training data
+    training_data['Target'] = 1  # Use 1 for the training data as the lookalike target
+
+    # Ensure all categorical variables are converted to numerical values
+    combined_data = pd.concat([training_data, testing_data], ignore_index=True)
+    combined_data = pd.get_dummies(combined_data)
+
+    # Handle missing values
+    imputer = SimpleImputer(strategy='mean')
+    combined_data_imputed = imputer.fit_transform(combined_data)
+
+    # Split combined data back into training and testing sets
+    X_train = combined_data_imputed[:len(training_data), :-1]  # Exclude Target column
+    y_train = combined_data_imputed[:len(training_data), -1]  # Target column
+    X_test = combined_data_imputed[len(training_data):, :-1]  # Exclude Target column
+
+    # Debugging: Print shapes of training and testing sets
+    st.write(f"X_train shape: {X_train.shape}")
+    st.write(f"y_train shape: {y_train.shape}")
+    st.write(f"X_test shape: {X_test.shape}")
+
+    if X_test.shape[0] == 0:
+        st.error("X_test is empty. Please check the data processing steps.")
+        return None, None
+    else:
+        # Scale data
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
+
+        # Train a linear regression model
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+
+        # Predict probabilities for the test data
+        y_pred_proba = model.predict(X_test)
+
+        # Calculate percentiles
+        percentiles = np.percentile(y_pred_proba, np.arange(100))
+
+        # Create a DataFrame with the original testing data and the predicted probabilities
+        testing_data_with_scores = testing_data.copy()
+        testing_data_with_scores['Lookalike_Score'] = y_pred_proba
+        testing_data_with_scores['Percentile'] = pd.qcut(y_pred_proba, 100, labels=False) + 1
+        return model, testing_data_with_scores
+
+# Function to re-run the model based on user input
 def re_run_model_based_on_query(model, training_data, testing_data, query):
     if "run for lookalikes in" in query.lower():
         emphasis_city = query.lower().replace("run for lookalikes in", "").strip()
@@ -184,8 +235,15 @@ if uploaded_training_file:
         cleaned_testing_data = process_uploaded_file(uploaded_testing_file)
 
         if cleaned_training_data is not None and cleaned_testing_data is not None:
+            # Choose model type
+            model_type = st.selectbox('Choose Model Type', ('Neural Network', 'Linear Regression'))
+
             # Run the initial model
-            model, testing_data_with_scores = run_model(cleaned_training_data, cleaned_testing_data)
+            if model_type == 'Neural Network':
+                model, testing_data_with_scores = run_neural_net_model(cleaned_training_data, cleaned_testing_data)
+            else:
+                model, testing_data_with_scores = run_linear_regression_model(cleaned_training_data, cleaned_testing_data)
+
             if model is not None:
                 st.write("Initial Model Results:")
                 st.write(testing_data_with_scores.head())
@@ -225,4 +283,6 @@ if uploaded_training_file:
                             except Exception as e:
                                 st.error(f"Error exporting the results: {e}")
 
-
+# Reset button to start over
+if st.button('Reset'):
+    st.experimental_rerun()
