@@ -18,7 +18,7 @@ else:
     openai.api_key = api_key
 
 st.title('Enhanced Data Processing and ML Model Interface')
-st.write("This app uses GPT-4.0 for data cleaning.")
+st.write("This app uses GPT-4o.")
 
 # Function to call OpenAI API for data cleaning
 def clean_data_with_chatgpt(dataframe):
@@ -35,7 +35,7 @@ def clean_data_with_chatgpt(dataframe):
     ]
 
     response = openai.ChatCompletion.create(
-        model="gpt-4.0",
+        model="gpt-3.5-turbo",
         messages=messages,
         max_tokens=1500
     )
